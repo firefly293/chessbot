@@ -42,6 +42,7 @@ class Game:
         self.blackUser = black_user
         self.whiteOfferedDraw = False
         self.blackOfferedDraw = False
+        self.takebackReqested = False
 class Challenge:
     def __init__(self, challenger_user: customMember, challenged_user: customMember, colorStr: str):
         self.challenger = challenger_user
@@ -90,6 +91,7 @@ async def move(interaction: discord.Interaction, move: str):
         # check if move is in legal moves
         if (move in valid_san_moves or move in valid_moves):
             globalGames[gameIndex].board.push_san(move)
+            globalGames[gameIndex].takebackReqested = False
             gameStatus = statusCheck(globalGames[gameIndex].board)
             currentTurnUser = None
             if (globalGames[gameIndex].board.turn == chess.WHITE):
@@ -223,6 +225,49 @@ async def declinedraw(interaction: discord.Interaction):
     else:
         await interaction.followup.send("You are not currently playing a game.")
 
+@tree.command(name="takeback", description="Request to take back your move.")
+async def takeback(interaction: discord.Interaction):
+    await interaction.response.defer()
+    gameIndex, inGame, isTurn = getGame(customMember.fromMember(interaction.user))
+    if (inGame):
+        if (not globalGames[gameIndex].takebackReqested):
+            if (not (len(globalGames[gameIndex].board.move_stack) == 0)):
+                if (not isTurn):
+                    await interaction.followup.send(f"{getOpponent(gameIndex, interaction.user).mention}, {interaction.user.name} wants to take back their move. Use /accepttakeback to accept it or play your next move to decline it.")
+                    globalGames[gameIndex].takebackReqested = True
+                else:
+                    await interaction.followup.send("The last move in the game was not yours, so you cannot request a takeback.")
+            else:
+                await interaction.followup.send("There are no moves to take back.")
+        else:
+            await interaction.followup.send("You have already requested a takeback.")
+    else:
+        await interaction.followup.send("You are not currently playing a game.")
+
+@tree.command(name="accepttakeback", description="Accept a takeback request.")
+async def accepttakeback(interaction: discord.Interaction):
+    await interaction.response.defer()
+    gameIndex, inGame, isTurn =  getGame(customMember.fromMember(interaction.user))
+    if (inGame):
+        if (isTurn):
+            # check if takeback was requested
+            if (globalGames[gameIndex].takebackReqested):
+                globalGames[gameIndex].board.pop()
+                globalGames[gameIndex].takebackReqested = False
+                boardPNG = None
+                if (len(globalGames[gameIndex].board.move_stack) == 0):
+                    boardPNG = await getBoardPNG(globalGames[gameIndex].board, orientation=globalGames[gameIndex].board.turn)
+                else:
+                    boardPNG = await getBoardPNG(globalGames[gameIndex].board, lastMove=globalGames[gameIndex].board.peek(), orientation=globalGames[gameIndex].board.turn)
+                await interaction.followup.send(f"Takeback was accepted. It's your move, {getOpponent(gameIndex, interaction.user).mention}. Here is the current state of the board:", file=boardPNG)
+            else:
+                await interaction.followup.send(f"{getOpponent(gameIndex, interaction.user).display_name} has not requested a takeback.")
+        else:
+            await interaction.followup.send(f"{getOpponent(gameIndex, interaction.user).display_name} has not requested a takeback.")
+    else:
+        await interaction.followup.send("You are not currently in playing a game.")
+
+
 @tree.command(name = "challenge", description="Create a new challenge!")
 @app_commands.describe(user="The user that you want to challenge.", color="'w' for white, 'b' for black, 'r' for random color")
 @app_commands.rename(user='user', color='color')
@@ -320,11 +365,6 @@ async def displayboard(interaction: discord.Interaction):
             return
     else:
         await interaction.followup.send("You are not currently playing a game")
-
-@tree.command(name = "disconnect", description="Disconnects the bot.")
-async def disconnect(interaction: discord.Interaction):
-    await interaction.response.send_message("Disconnected bot.", ephemeral=True)
-    await client.close()
 
 @client.event
 async def on_ready():
@@ -436,7 +476,9 @@ def encodeGame(game: Game) -> str:
     # save whiteOfferedDraw
     gamestr += str(game.whiteOfferedDraw) + ' '
     # save blackOfferedDraw
-    gamestr += str(game.blackOfferedDraw)
+    gamestr += str(game.blackOfferedDraw) + ' '
+    # save takebackRequest
+    gamestr += str(game.takebackReqested)
 
     return gamestr
 
@@ -483,11 +525,15 @@ def decodeGame(gamestr: str) -> Game:
     # blackOfferedDraw
     blackOfferedDraw = (tokens[tokenCount] == "True")
     tokenCount += 1
+    # takebackRequested
+    takebackRequested = (tokens[tokenCount] == "True")
+    tokenCount += 1
 
     game = Game(whiteUser, blackUser)
     game.board = board
     game.whiteOfferedDraw = whiteOfferedDraw
     game.blackOfferedDraw = blackOfferedDraw
+    game.takebackReqested = takebackRequested
     return game
 
 def saveGames(gameList: List[Game], filePath: str) -> None:
