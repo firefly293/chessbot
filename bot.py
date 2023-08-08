@@ -624,10 +624,10 @@ if (len(globalGames) > 0):
     print("saved games")
 else:
     with (open("saves/games.save", "w") as file):
-        file.flush()
+        file.truncate(0)
 if (len(globalChallenges) > 0):
     saveChallenges(globalChallenges, "saves/challenges.save")
     print("saved challenges")
 else:
     with (open("saves/challenges.save", "w") as file):
-        file.flush()
+        file.truncate(0)
