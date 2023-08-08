@@ -1,9 +1,6 @@
 # imports
-import asyncio
 import io
-import json
 import os
-import pickle
 import random
 from typing import List
 
@@ -11,7 +8,6 @@ import cairosvg
 import chess
 import chess.svg
 import discord
-import requests
 from discord import app_commands
 
 #import pickle
