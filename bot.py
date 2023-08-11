@@ -362,6 +362,21 @@ async def displayboard(interaction: discord.Interaction):
     else:
         await interaction.followup.send("You are not currently playing a game")
 
+@tree.command(name='premove', description='Enter a move beforehand and it will be played (if it can) after the opponent makes their move')
+@app_commands.describe(move='The move you want to premove')
+@app_commands.rename(move='move')
+async def premove(interaction: discord.Interaction, move: str):
+    await interaction.response.defer(ephemeral=True)
+    gameIndex, isGame, isTurn = getGame(customMember.fromMember(interaction.user))
+
+    if (isGame):
+        if (not isTurn):
+            pass
+        else:
+            await interaction.followup.send("You cannot premove on your turn.")
+    else:
+        await interaction.followup.send("You are not currently playing a game.")
+
 @client.event
 async def on_ready():
     commands = await tree.sync()

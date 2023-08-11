@@ -1,2 +1,5 @@
 # ignore save files
 *.save
+
+# ignore the .vscode/settings.json file
+.vscode/*
